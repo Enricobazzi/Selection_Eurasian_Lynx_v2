@@ -37,3 +37,8 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+.Rproj.user
+
+# Additional files
+3-Identify_Candidate_Loci/plots
+4-Downstream_Analyses/plots
