@@ -92,8 +92,6 @@ library(viridis)
 library(RColorBrewer)
 library(vegan)
 library(adegenet)
-library(PopGenReport)
-library(gdistance)
 
 # Load environmental data
 env.predictors <- read_tsv("2-Prepare_Environmental_Data/uncorrelated_variables_matrix.tsv", col_names = T) %>%
@@ -194,5 +192,195 @@ points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3, choices=
 points(rda, display="sites", pch=21, cex=1.2, col="gray32", scaling=3, bg=bg[num], choices=c(5,6)) # the wolves
 text(rda, scaling=3, display="bp", col="#0868ac", cex=1, choices=c(5,6))     # the predictors
 #legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+```
 
+## RDA on neutral regions only
+
+Filter the VCF to remove candidate regions and all genes.
+
+Intergenic regions were identified by Dani as follows:
+```{bash}
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis
+
+awk -F"\t" '$3 == "gene" {printf ("%s\t%s\t%s\n", $1, $4-5001, $5+5000)}' lc4.NCBI.nr_main.gff3 \
+ > lc4.NCBI.nr_main.genes.plus5000.temp_bed
+
+join -1 1 -2 1 <(LANG=en_EN sort -k1,1 -k2,2n -k3,3n lc_ref_all_the_genome.bed) \
+ <(LANG=en_EN sort -k1,1 -k2,2n -k3,3n lc4.NCBI.nr_main.genes.plus5000.temp_bed) | 
+ awk -v OFS='\t' '{if ($4<0) {$4="1"} else {$4=$4}; print}' | 
+ awk -v OFS='\t' '{if ($5>$3) {$5=$3} else {$5=$5}; print $1,$4,$5}' | 
+ bedtools merge -i stdin -d 1 > lc4.NCBI.nr_main.genes.plus5000.bed
+
+rm lc4.NCBI.nr_main.genes.plus5000.temp_bed
+
+bedtools subtract -a lc_ref_all_the_genome.bed -b lc4.NCBI.nr_main.genes.plus5000.bed \
+ > lc4.NCBI.nr_main.intergenic.buffer5000.bed
+```
+Remove those regions from the VCF
+```{bash}
+# on genomics-a
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/VCF
+
+bedtools subtract -header -a ll_wholegenome_LyCa_ref.sorted.filter7.vcf \
+ -b /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.NCBI.nr_main.intergenic.buffer5000.bed \
+ > ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.vcf
+``` 
+From 4983054 whole genome SNPs to 2507494 intergenic SNPs.
+
+Now remove also any candidate of selection - the SNPs from the RDA and the GenWin windows from BayPass
+```{bash}
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/
+# create a new VCF to substract from sequentially
+cp VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.vcf \
+ VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf
+ 
+# Subtract GenWin windows sequentially from new VCF
+for var in bio2 bio5 bio6 bio8 bio13 jan_depth snow_days
+ do
+  echo "filtering ${var} regions"
+  bedtools subtract -header -a VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+   -b GenWin/${var}_GenWin_windows_outliers.bed \
+   > tmp && mv tmp VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf
+done
+
+# Subtract RDA SNPs from new VCF
+bedtools subtract -header -a VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+ -b RDA/rda_candidate_snps.bed \
+ > tmp && mv tmp VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf
+```
+We have a total of 2458450 non-selected intergenic SNPs
+
+Now to create a RAW file with plink
+```{bash}
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/VCF/
+# I manually created a file listing samples to remove for plink with following format:
+# c_ll_ba_0216 c_ll_ba_0216 0 0 0 -9
+# c_ll_ba_0233 c_ll_ba_0233 0 0 0 -9
+# c_ll_cr_0211 c_ll_cr_0211 0 0 0 -9
+# h_ll_ba_0214 h_ll_ba_0214 0 0 0 -9
+# h_ll_ba_0215 h_ll_ba_0215 0 0 0 -9
+
+# prune snps based on ld (VIF < 2)
+plink_1.9 --vcf ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+--double-id --allow-extra-chr --set-missing-var-ids @:# --geno 0 \
+--remove samplestoremove.txt --indep 100 10 2
+
+# take only a subsample of 10k of the pruned SNPs
+plink_1.9 --vcf ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+--double-id --allow-extra-chr --set-missing-var-ids @:# \
+--remove samplestoremove.txt --geno 0 --extract <(shuf -n 10000 plink.prune.in) \
+--recode A --out intergenic_neutral_snps
+```
+Copy to laptop
+```{bash}
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/VCF/intergenic_neutral_snps.raw Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
+```
+Prepare R for RDA on laptop
+```{R}
+# load libraries
+library(tidyverse)
+library(viridis)
+library(RColorBrewer)
+library(vegan)
+library(adegenet)
+
+# Load environmental data
+env.predictors <- read_tsv("2-Prepare_Environmental_Data/uncorrelated_variables_matrix.tsv", col_names = T) %>%
+  column_to_rownames(., var="sample")
+
+# Load GenoType Data - choose set of vars file
+gt_data <- read.PLINK("4-Downstream_Analyses/tables/intergenic_neutral_snps.raw")
+gt_data_tsv <- data.frame(as.matrix(gt_data))
+```
+Run RDA
+```{R}
+rda <- rda(gt_data ~ ., data=env.predictors, scale=T)
+signif.axis <- anova.cca(rda, by="axis", parallel=getOption("mc.cores"))
+```
+Prepare plot
+```{R}
+# Add populations and colors
+loc <- rep(NA, NROW(gt_data_tsv))
+loc[grep("ba", rownames(gt_data_tsv))] <- "Balkans"
+loc[grep("ca", rownames(gt_data_tsv))] <- "Caucasus"
+loc[grep("cr", rownames(gt_data_tsv))] <- "Carpathians"
+loc[grep("ka", rownames(gt_data_tsv))] <- "Mongolia"
+loc[grep("ki", rownames(gt_data_tsv))] <- "Kirov"
+loc[grep("la", rownames(gt_data_tsv))] <- "Latvia"
+loc[grep("no", rownames(gt_data_tsv))] <- "Norway"
+loc[grep("po", rownames(gt_data_tsv))] <- "NE-Poland"
+loc[grep("og", rownames(gt_data_tsv))] <- "Mongolia"
+loc[grep("to", rownames(gt_data_tsv))] <- "Mongolia"
+loc[grep("tu", rownames(gt_data_tsv))] <- "Tuva"
+loc[grep("ur", rownames(gt_data_tsv))] <- "Urals"
+loc[grep("vl", rownames(gt_data_tsv))] <- "Vladivostok"
+loc[grep("ya", rownames(gt_data_tsv))] <- "Yakutia"
+
+num <- rep(NA, NROW(gt_data_tsv))
+num[grep("ba", rownames(gt_data_tsv))] <- 1
+num[grep("ca", rownames(gt_data_tsv))] <- 3
+num[grep("cr", rownames(gt_data_tsv))] <- 2
+num[grep("ka", rownames(gt_data_tsv))] <- 6
+num[grep("ki", rownames(gt_data_tsv))] <- 4
+num[grep("la", rownames(gt_data_tsv))] <- 5
+num[grep("no", rownames(gt_data_tsv))] <- 8
+num[grep("po", rownames(gt_data_tsv))] <- 7
+num[grep("og", rownames(gt_data_tsv))] <- 6
+num[grep("to", rownames(gt_data_tsv))] <- 6
+num[grep("tu", rownames(gt_data_tsv))] <- 9
+num[grep("ur", rownames(gt_data_tsv))] <- 10
+num[grep("vl", rownames(gt_data_tsv))] <- 11
+num[grep("ya", rownames(gt_data_tsv))] <- 12
+
+ola <- data.frame(sample = rownames(gt_data_tsv), pop = loc, n = num)
+eco <- levels(ola$pop)
+bg <- cols <- c("#A035AF",
+                brewer.pal(12,"Paired")[9],
+                "#B8860b",
+                viridis_pal()(5)[1],
+                brewer.pal(12,"Paired")[3],
+                brewer.pal(12,"Paired")[7],
+                viridis_pal()(5)[3],
+                viridis_pal()(5)[2],
+                brewer.pal(12,"Paired")[8],
+                "#0F4909",
+                brewer.pal(12,"Paired")[5],
+                brewer.pal(12,"Paired")[6])
+```
+plot
+```{R}
+# RDA1 v RDA2
+plot(rda, type="n", scaling=3)
+points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3)           # the SNPs
+points(rda, display="sites", pch=21, cex=1.5, col="gray32", scaling=3, bg=bg[num]) # the wolves
+text(rda, scaling=3, display="bp", col="#0868ac", cex=1)     # the predictors
+#legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+
+# RDA1 v RDA3
+plot(rda, type="n", scaling=3, choices=c(1,3))
+points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3, choices=c(1,3))           # the SNPs
+points(rda, display="sites", pch=21, cex=1.5, col="gray32", scaling=3, bg=bg[num], choices=c(1,3)) # the wolves
+text(rda, scaling=3, display="bp", col="#0868ac", cex=1, choices=c(1,3))     # the predictors
+#legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+
+# RDA2 v RDA3
+plot(rda, type="n", scaling=3, choices=c(2,3))
+points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3, choices=c(2,3))           # the SNPs
+points(rda, display="sites", pch=21, cex=1.5, col="gray32", scaling=3, bg=bg[num], choices=c(2,3)) # the wolves
+text(rda, scaling=3, display="bp", col="#0868ac", cex=1, choices=c(2,3))     # the predictors
+#legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+
+# RDA3 v RDA4
+plot(rda, type="n", scaling=3, choices=c(3,4))
+points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3, choices=c(3,4))           # the SNPs
+points(rda, display="sites", pch=21, cex=1.5, col="gray32", scaling=3, bg=bg[num], choices=c(3,4)) # the wolves
+text(rda, scaling=3, display="bp", col="#0868ac", cex=1, choices=c(3,4))     # the predictors
+#legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+
+# RDA5 v RDA6
+plot(rda, type="n", scaling=3, choices=c(5,6))
+points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3, choices=c(5,6))           # the SNPs
+points(rda, display="sites", pch=21, cex=1.2, col="gray32", scaling=3, bg=bg[num], choices=c(5,6)) # the wolves
+text(rda, scaling=3, display="bp", col="#0868ac", cex=1, choices=c(5,6))     # the predictors
+#legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
 ```
