@@ -159,11 +159,17 @@ bg <- cols <- c("#A035AF",
 plot
 ```{R}
 # RDA1 v RDA2
+pdf(file = paste0("4-Downstream_Analyses/plots/candidate_rda1_rda2.pdf"),
+    width = 8,
+    height = 8)
+
 plot(rda, type="n", scaling=3)
 points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3)           # the SNPs
 points(rda, display="sites", pch=21, cex=1.5, col="gray32", scaling=3, bg=bg[num]) # the wolves
 text(rda, scaling=3, display="bp", col="#0868ac", cex=1)     # the predictors
 #legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+
+dev.off()
 
 # RDA1 v RDA3
 plot(rda, type="n", scaling=3, choices=c(1,3))
@@ -350,11 +356,17 @@ bg <- cols <- c("#A035AF",
 plot
 ```{R}
 # RDA1 v RDA2
+pdf(file = paste0("4-Downstream_Analyses/plots/neutral_rda1_rda2.pdf"),
+    width = 8,
+    height = 8)
+
 plot(rda, type="n", scaling=3)
 points(rda, display="species", pch=4, cex=0.7, col="gray32", scaling=3)           # the SNPs
 points(rda, display="sites", pch=21, cex=1.5, col="gray32", scaling=3, bg=bg[num]) # the wolves
 text(rda, scaling=3, display="bp", col="#0868ac", cex=1)     # the predictors
 #legend("topright", legend=eco, bty="n", col="gray32", pch=21, cex=0.7, pt.bg=bg) # legend
+
+dev.off()
 
 # RDA1 v RDA3
 plot(rda, type="n", scaling=3, choices=c(1,3))
