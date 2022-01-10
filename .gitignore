@@ -40,5 +40,10 @@ vignettes/*.pdf
 .Rproj.user
 
 # Additional files
+2-Prepare_Environmental_Data/tables/Snow_data_daily
 3-Identify_Candidate_Loci/plots
+3-Identify_Candidate_Loci/tables
 4-Downstream_Analyses/plots
+4-Downstream_Analyses/tables
+wc10
+

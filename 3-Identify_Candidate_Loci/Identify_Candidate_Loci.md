@@ -50,14 +50,57 @@ done
 cat *_intersect_candidate_snps.bed | sort -k 1,1 -k2,2n | uniq > total_intersect_candidate_snps.bed
 cat *_intersect_candidate_windows.bed | sort -k 1,1 -k2,2n | uniq | bedtools merge -i - > total_intersect_candidate_windows.bed
 ```
-bio2 has a total of 244 candidate SNPs, a total of 35 candidate genomic windows spanning a total of 800000 bps
-bio5 has a total of 226 candidate SNPs, a total of 43 candidate genomic windows spanning a total of 1040000 bps
-bio6 has a total of 429 candidate SNPs, a total of 55 candidate genomic windows spanning a total of 1220000 bps
-bio8 has a total of 234 candidate SNPs, a total of 25 candidate genomic windows spanning a total of 670000 bps
-bio13 has a total of 79 candidate SNPs, a total of 34 candidate genomic windows spanning a total of 610000 bps
-jan_depth has a total of 1109 candidate SNPs, a total of 82 candidate genomic windows spanning a total of 1870000 bps
-snow_days has a total of 894 candidate SNPs, a total of 63 candidate genomic windows spanning a total of 1460000 bps
+bio2 has a total of 1696 candidate SNPs, a total of 326 candidate genomic windows spanning a total of 7240000 bps
+bio5 has a total of 1754 candidate SNPs, a total of 334 candidate genomic windows spanning a total of 7720000 bps
+bio6 has a total of 2193 candidate SNPs, a total of 369 candidate genomic windows spanning a total of 8210000 bps
+bio8 has a total of 1567 candidate SNPs, a total of 307 candidate genomic windows spanning a total of 6740000 bps
+bio13 has a total of 824 candidate SNPs, a total of 274 candidate genomic windows spanning a total of 6610000 bps
+jan_depth has a total of 4540 candidate SNPs, a total of 622 candidate genomic windows spanning a total of 13950000 bps
+snow_days has a total of 3518 candidate SNPs, a total of 505 candidate genomic windows spanning a total of 10910000 bps
 
-total candidate SNPs : 2637
-total candidate genomic windows : 220
-total length of candidate genomic windows : 6.63 Mbp
+total candidate SNPs : 10791
+total candidate genomic windows : 1620
+total length of candidate genomic windows : 49.19 Mbp
+
+To get the TOPSNP of each candidate window:
+```{bash}
+# on genomics-a:
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/
+
+# get topsnps from all uncorrelated predictors
+rm Intersect/uncorvars_topsnps.range
+for var in bio2 bio5 bio6 bio8 bio13 jan_depth snow_days
+ do
+  echo "${var}"
+  cat GenWin/${var}_topsnps.range >> Intersect/uncorvars_topsnps.range
+done
+```
+Problem = more than one topsnp for each candidate window (window is same topsnp is different because from different variable or originally window was split in 2)
+Solution = get topsnps from each candidate window with only one topnsp and then get one random topsnp from each window with more than one
+```{bash}
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/Intersect
+
+# get list of candidate windows with ONE topsnp
+bedtools intersect -wo -a total_intersect_candidate_windows.bed \
+ -b <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) |
+ cut -f1,2,3 | uniq -u > topsnps_nodupwindows.bed
+ 
+# get topsnp from each window with ONE topsnp
+bedtools intersect -a <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) \
+ -b topsnps_nodupwindows.bed > topsnps_nodupwindows_onesnp.bed
+
+# get list of candidate windows with MORE than one topsnp
+bedtools intersect -wo -a total_intersect_candidate_windows.bed \
+ -b <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) |
+ cut -f1,2,3 | uniq -d > topsnps_dupwindows.bed
+
+# get only one topsnp for each of the windows with duplicates
+while read p; do
+  bedtools intersect -a <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) -b <(echo "$p") | shuf -n 1
+done < topsnps_dupwindows.bed > topsnps_dupwindows_onerand.bed
+
+# get full list of topsnps (only one per window)
+cat topsnps_nodupwindows_onesnp.bed topsnps_dupwindows_onerand.bed | sort -k 1,1 -k2,2n \
+ > total_intersect_candidate_windows_topsnps.bed
+```
+Total of 1610 topsnps found from 1610 unique candidate windows - although initially 1620 candidate windows, 11 of them are from the inversion so only 1 SNP will be extracted from them
