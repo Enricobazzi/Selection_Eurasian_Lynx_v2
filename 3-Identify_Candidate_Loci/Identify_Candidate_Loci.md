@@ -104,3 +104,96 @@ cat topsnps_nodupwindows_onesnp.bed topsnps_dupwindows_onerand.bed | sort -k 1,1
  > total_intersect_candidate_windows_topsnps.bed
 ```
 Total of 1610 topsnps found from 1610 unique candidate windows - although initially 1620 candidate windows, 11 of them are from the inversion so only 1 SNP will be extracted from them
+
+## Plotting results
+
+```{R}
+library(tidyverse)
+library(venn)
+
+variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
+
+## Manhattan plotting outlier and candidate windows ##
+
+for (k in 1:length(variables)){
+
+ # Variable:
+ var=variables[k]
+
+ # Windows
+ windows <- read.table(paste0("3-Identify_Candidate_Loci/tables/",var,"_GenWin_windows.tsv"),
+                               h=T, as.is = T)
+ 
+ # Outliers
+ outlier_windows <- read.table(paste0("3-Identify_Candidate_Loci/tables/",var,"_GenWin_windows_outliers.tsv"),
+                               h=T, as.is = T)
+ 
+ # Outliers intersected
+ intersect_table <- read.table(paste0("3-Identify_Candidate_Loci/tables/total_intersect_candidate_windows.bed"),
+                               h=F, as.is = T)
+ 
+ intersect_windows <- data.frame()
+ for (n in 1:NROW(intersect_table)){
+   row <- intersect_table[n,]
+   SUB <- subset(outlier_windows, scaffold == row$V1 & WindowStart >= row$V2 & WindowStop <= row$V3)
+   intersect_windows <- rbind(intersect_windows, SUB)
+ }
+ 
+ # plot
+ p <- ggplot() +
+   geom_point(data=windows, aes(x=WindowNumber, y=Wstat), color="grey32", shape=4, size=1.5) +
+   geom_point(data=outlier_windows, aes(x=WindowNumber, y=Wstat), color="gold2",shape=4, size=1.5) +
+   geom_point(data=intersect_windows, aes(x=WindowNumber, y=Wstat), color="brown", fill="gold2", shape=21, size=3) +
+   theme_minimal()
+ 
+ ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/outliers_intersect_", var, "_manplot.pdf"),  width = 14,
+     height = 4)
+ 
+}
+
+## Plot intersections with Venn Diagrams ##
+
+variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
+
+v.list <- list()
+
+for (k in 1:length(variables)){
+ 
+ # Variable:
+ var=variables[k]
+
+ # Outliers
+ outlier_windows <- read.table(paste0("3-Identify_Candidate_Loci/tables/",var,"_GenWin_windows_outliers.tsv"),
+                               h=T, as.is = T)
+ 
+ # Outliers intersected
+ intersect_table <- read.table(paste0("3-Identify_Candidate_Loci/tables/total_intersect_candidate_windows.bed"),
+                               h=F, as.is = T)
+ 
+ intersect_table$V4 <- 1:NROW(intersect_table)
+ 
+ intersect_windows <- data.frame()
+ for (n in 1:NROW(outlier_windows)){
+  row <- outlier_windows[n,]
+  SUB <- subset(intersect_table, V1 == row$scaffold & V2 <= row$WindowStart & V3 >= row$WindowStop)
+  intersect_windows <- rbind(intersect_windows, SUB)
+ }
+
+ # Create vector of intersect window numbers
+ vec <- c(as.character(intersect_windows$V4))
+ 
+ # add vector to list
+ v.list <- c(v.list, list(vec))
+}
+length(unique(unlist(v.list)))
+venn(6)
+pdf(file = paste0("3-Identify_Candidate_Loci/plots/intersect_venn_diagram.pdf"),
+    width = 8,
+    height = 8)
+venn(v.list, snames = variables, 
+     #zcolor = "lightseagreen, chartreuse3, coral, firebrick3, purple, gold, dodgerblue4",
+     zcolor = 'style',
+     ilcs = 0.9,
+     box = F)
+dev.off()
+```
