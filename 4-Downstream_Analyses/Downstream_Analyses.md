@@ -1176,7 +1176,7 @@ ggplot() +
 dev.off()
 ```
 
-#### PIE CHARTS of each population's allele frequency of inversion
+### PIE CHARTS of each population's allele frequency of inversion
 
 ```{R}
 allele.freq.table <- data.frame()
@@ -1235,4 +1235,13 @@ for (n in 1:length(unique(allele.freq.table$pop))){
   ggsave(pie, filename = paste0("4-Downstream_Analyses/plots/inversion_",POP,"_pie.pdf"),  bg = "transparent")
 
 }
+```
+
+## 3. Functional annotation of candidate regions
+
+Now we want to check what genes are involved in the adaptive process. To do so, I can intersect the candidate windows with the functional annotation file of my reference genome. The extracted list of genes can be analyzed to discover which functional groups the genes belong to and even test for enrichment of particular functions.
+
+To extract the genes from the dataset
+
+```{bash}
 ```

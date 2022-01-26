@@ -186,7 +186,7 @@ for (k in 1:length(variables)){
  v.list <- c(v.list, list(vec))
 }
 length(unique(unlist(v.list)))
-venn(6)
+
 pdf(file = paste0("3-Identify_Candidate_Loci/plots/intersect_venn_diagram.pdf"),
     width = 8,
     height = 8)
@@ -196,4 +196,54 @@ venn(v.list, snames = variables,
      ilcs = 0.9,
      box = F)
 dev.off()
+```
+
+## Plotting INVERSION
+
+
+```{R}
+library(tidyverse)
+
+variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
+
+for (k in 1:length(variables)){
+ # Variable:
+ var=variables[k]
+
+ # Windows
+ snps.table <- data.frame()
+ 
+ # Fill SNPs dataframe with all BayPass results for the variable
+ for (n in 1:50){
+  # upload the dataset table:
+  print(n)
+  var.snp=read.table(paste0("3-Identify_Candidate_Loci/tables/BayPass_OutPut/AUX_",
+                            var,"_",n,"_summary_betai.out"),h=T)
+  
+  # calculate the SNP database number sequence (1 every 50) 
+  # NOTE: 2100553 is the total number of SNPs in all datasets
+  var.snp <- data.frame(var.snp, SNPnum = seq(n, 2100553, by = 50))
+  
+  # add the dataset rows to the total snps table
+  snps.table <- rbind(snps.table, var.snp)
+ }
+ # order the table based on the SNP number
+ snps.table <- snps.table %>% arrange(SNPnum)
+ 
+ # Add SNP ID information from SNPIDs table
+ SNPIDs <- read_tsv("3-Identify_Candidate_Loci/tables/BayPass_OutPut/finalset.maf5pc.SNPIDs",
+                    col_names = F)[,2-3] %>%
+    rename("scaffold" =  X2, "position" = X3)
+  
+ # Add SNP IDs to the total snps table
+ snps.table <- data.frame(snps.table,SNPIDs)
+ 
+ inversion_snps <- subset(snps.table, scaffold == "scaffold_17_arrow_ctg1" & position >= 14005000 & position <= 22000000)
+
+ p <- ggplot() +
+   geom_point(data=inversion_snps, aes(x=position, y=BF.dB.), fill="grey32", shape=21, size=1.5) +
+   theme_minimal()
+ ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_", var, "_manplot.pdf"),  width = 14,
+     height = 4)
+}
 ```
