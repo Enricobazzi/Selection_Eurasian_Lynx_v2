@@ -1241,7 +1241,42 @@ for (n in 1:length(unique(allele.freq.table$pop))){
 
 Now we want to check what genes are involved in the adaptive process. To do so, I can intersect the candidate windows with the functional annotation file of my reference genome. The extracted list of genes can be analyzed to discover which functional groups the genes belong to and even test for enrichment of particular functions.
 
-To extract the genes from the dataset
-
+To extract the genes present in the candidate regions:
 ```{bash}
+# On genomics-a
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation
+
+# bedtools to intersect bed with gff3 and get a bed of overlapping gene regions
+bedtools intersect -wb \
+ -a ../Intersect/total_intersect_candidate_windows.bed \
+ -b /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.NCBI.nr_main.gff3 |
+ grep "gbkey=Gene" | cut -f1,2,3,12 \
+ > total_intersect_candidate_windows_intersect_genes.bed
+# a total of 1018 regions were found
+
+# extract list of genes
+cut -d'-' -f2 total_intersect_candidate_windows_intersect_genes.bed | 
+ cut -d';' -f1 | sort -u \
+ > total_intersect_candidate_windows_intersect_genes_list.txt
+# a total of 895 gene IDs were found
+# 110 of them have a LOC identifying number from the annotation
+# -- CHECK what they mean -- #
+
+# extract list of genes for snow_days and bio2 - TOP ranking variables in GDM
+for var in bio2 snow_days
+ do
+  bedtools intersect -wb \
+   -a total_intersect_candidate_windows_intersect_genes.bed \
+   -b ../Intersect/${var}_intersect_candidate_windows.bed |
+   cut -d'-' -f2 | cut -d';' -f1 | sort -u \
+   > ${var}_candidate_windows_intersect_genes_list.txt
+done
+```
+Download gene list to laptop
+```{bash}
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation/total_intersect_candidate_windows_intersect_genes_list.txt Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
+
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation/bio2_candidate_windows_intersect_genes_list.txt Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
+
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation/snow_days_candidate_windows_intersect_genes_list.txt Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
 ```
