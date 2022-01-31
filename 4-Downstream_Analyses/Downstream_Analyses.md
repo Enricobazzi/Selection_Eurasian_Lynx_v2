@@ -60,12 +60,18 @@ samples_to_remove <- c("c_ll_ba_0216","c_ll_ba_0233","c_ll_cr_0211","h_ll_ba_021
 snp <- read.table("4-Downstream_Analyses/tables/topsnps_rformat.forR", header = T, row.names = 1)
 snp <- snp[!(row.names(snp) %in% samples_to_remove),]
 
-# env.data
+# env.data uncorr variables
 clim.data <- read_tsv("2-Prepare_Environmental_Data/uncorrelated_variables_matrix.tsv", col_names = T) %>%
   column_to_rownames(., var="sample")
 
 clim.data <- read_tsv("2-Prepare_Environmental_Data/uncorrelated_variables_matrix.tsv", col_names = T) %>%
   column_to_rownames(., var="sample")
+
+# env.data all variables
+varmatrix <- read_tsv("2-Prepare_Environmental_Data/WorldClim_table_persample.tsv") %>% column_to_rownames(., var="sample")
+snowdata <- read_tsv("2-Prepare_Environmental_Data/Snow_table_persample.tsv") %>% column_to_rownames(., var="sample")
+
+clim.data <- cbind(varmatrix, snowdata)
 
 # coordinates
 coord_table <- read_delim("~/Dropbox/LL_LC_LR_Databases/LL_coords/csv_LL_selection_coords_wholeset.csv",
@@ -114,7 +120,7 @@ dev.off()
 
 
 plot(gdm, plot.layout = c(2, 5))
-
+plot(gdm)
 pdf(file = paste0("4-Downstream_Analyses/plots/GDM_effect_uncertainty.pdf"),
     width = 8,
     height = 8)
