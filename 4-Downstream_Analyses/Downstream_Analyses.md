@@ -127,6 +127,8 @@ library(raster)
 library(rgdal)
 library(grDevices)
 library(sf)
+library(viridis)
+library(RColorBrewer)
 
 # bio variables
 worldclim <- getData("worldclim", var = "bio", res = 10)
@@ -198,9 +200,66 @@ clim.trans[[5]] <- (clim.trans[[5]]-clim.trans[[5]]@data@min) / (clim.trans[[5]]
 clim.trans[[6]] <- (clim.trans[[6]]-clim.trans[[6]]@data@min) / (clim.trans[[6]]@data@max-clim.trans[[6]]@data@min)*255
 clim.trans[[7]] <- (clim.trans[[7]]-clim.trans[[7]]@data@min) / (clim.trans[[7]]@data@max-clim.trans[[7]]@data@min)*255
 
-pdf("4-Downstream_Analyses/plots/GDM_wholeset_Rbio2_Gbio6_BsnowD_RGBmap.pdf")
-plotRGB(clim.trans, r=3, g=5, b=7, bgalpha=0, interpolate=T)
-points(clim.points$x,clim.points$y, pch=4, cex=0.2)
+distr.map <- readOGR("~/Downloads/redlist_species_data_1f4a1a8f-31fa-48ee-8678-7435f90a8ff9/data_0.shp")
+
+r2 <- crop(clim.trans, extent(distr.map))
+r3 <- mask(r2, distr.map)
+
+# Add populations and colors clim.points
+loc <- rep(NA, NROW(clim.data))
+loc[grep("ba", rownames(clim.data))] <- "Balkans"
+loc[grep("ca", rownames(clim.data))] <- "Caucasus"
+loc[grep("cr", rownames(clim.data))] <- "Carpathians"
+loc[grep("ka", rownames(clim.data))] <- "Mongolia"
+loc[grep("ki", rownames(clim.data))] <- "Kirov"
+loc[grep("la", rownames(clim.data))] <- "Latvia"
+loc[grep("no", rownames(clim.data))] <- "Norway"
+loc[grep("po", rownames(clim.data))] <- "NE-Poland"
+loc[grep("og", rownames(clim.data))] <- "Mongolia"
+loc[grep("to", rownames(clim.data))] <- "Mongolia"
+loc[grep("tu", rownames(clim.data))] <- "Tuva"
+loc[grep("ur", rownames(clim.data))] <- "Urals"
+loc[grep("vl", rownames(clim.data))] <- "Vladivostok"
+loc[grep("ya", rownames(clim.data))] <- "Yakutia"
+
+num <- rep(NA, NROW(clim.data))
+num[grep("ba", rownames(clim.data))] <- 1
+num[grep("ca", rownames(clim.data))] <- 3
+num[grep("cr", rownames(clim.data))] <- 2
+num[grep("ka", rownames(clim.data))] <- 6
+num[grep("ki", rownames(clim.data))] <- 4
+num[grep("la", rownames(clim.data))] <- 5
+num[grep("no", rownames(clim.data))] <- 8
+num[grep("po", rownames(clim.data))] <- 7
+num[grep("og", rownames(clim.data))] <- 6
+num[grep("to", rownames(clim.data))] <- 6
+num[grep("tu", rownames(clim.data))] <- 9
+num[grep("ur", rownames(clim.data))] <- 10
+num[grep("vl", rownames(clim.data))] <- 11
+num[grep("ya", rownames(clim.data))] <- 12
+
+ola <- data.frame(sample = rownames(clim.data), pop = loc, n = num)
+eco <- levels(ola$pop)
+bg <- cols <- c("#A035AF",
+                brewer.pal(12,"Paired")[9],
+                "#B8860b",
+                viridis_pal()(5)[1],
+                brewer.pal(12,"Paired")[3],
+                brewer.pal(12,"Paired")[7],
+                viridis_pal()(5)[3],
+                viridis_pal()(5)[2],
+                brewer.pal(12,"Paired")[8],
+                "#0F4909",
+                brewer.pal(12,"Paired")[5],
+                brewer.pal(12,"Paired")[6])
+
+# 5=bio6, 3=bio2, 7=snow_days
+
+pdf("4-Downstream_Analyses/plots/GDM_wholeset_Rbio2_Gbio6_BsnowD_cool_RGBmap.pdf", width = 14)
+plotRGB(clim.trans, r=3, g=5, b=7, bgalpha=0, alpha=180, integrate=T)
+plotRGB(r3, r=3, g=5, b=7, bgalpha=0, add=T)
+plot(distr.map, lwd=1.5, add=T)
+points(clim.points$x,clim.points$y, pch=21, lwd=1.5, cex=1.2, col="black", bg=bg[num]) # the lynxes
 dev.off()
 
 
@@ -1271,6 +1330,13 @@ for var in bio2 snow_days
    cut -d'-' -f2 | cut -d';' -f1 | sort -u \
    > ${var}_candidate_windows_intersect_genes_list.txt
 done
+
+# extract list of genes in the inversion
+bedtools intersect -wb \
+ -a ../Intersect/inversion.bed \
+ -b /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.NCBI.nr_main.gff3 |
+ grep "gbkey=Gene" | cut -f1,2,3,12 | cut -d'-' -f2 | cut -d';' -f1 | sort -u \
+ > inversion_genes_list.txt
 ```
 Download gene list to laptop
 ```{bash}
@@ -1279,4 +1345,7 @@ scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Ly
 scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation/bio2_candidate_windows_intersect_genes_list.txt Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
 
 scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation/snow_days_candidate_windows_intersect_genes_list.txt Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
+
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Annotation/inversion_genes_list.txt Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
 ```
+Input the list of gene IDs into Panther to make a comparison using the Felis catus annotation for GO-term representation

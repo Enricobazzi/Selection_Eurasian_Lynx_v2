@@ -129,13 +129,14 @@ vif_func(varmatrix_short, trace =T, thresh = 4)
 varmatrix_final <- varmatrix2[,c(2,5,6,8,13,20,21)]
 
 usdm::vifcor(varmatrix_final, th=10)
-#  Variables      VIF
-#      bio6 2.063074
-#      bio5 1.470012
-#      bio8 1.590901
-#     bio13 1.309183
-# jan_depth 1.586499
-# snow_days 2.658886
+#   Variables   VIF
+#      bio2     3.976499
+#      bio5     2.158984
+#      bio6     3.750249
+#      bio8     1.594988
+#     bio13     1.412701
+# jan_depth     2.236679
+# snow_days     3.329262
 
 
 # final set of variables - strict
@@ -154,4 +155,13 @@ usdm::vifcor(varmatrix_final, th=10)
 export_final <- data.frame(varmatrix_final) %>% rownames_to_column(., var = "sample")
 
 write_tsv(export_final, "2-Prepare_Environmental_Data/uncorrelated_variables_matrix.tsv") 
+```
+Correlation plot of uncorrelated set of variables
+```{R}
+varmatrix <- read_tsv("2-Prepare_Environmental_Data/uncorrelated_variables_matrix.tsv") %>% column_to_rownames(., var="sample")
+pdf(file = paste0("2-Prepare_Environmental_Data/plots/uncorrelated_variables_pairs.panels.pdf"),
+    width = 13,
+    height = 8)
+pairs.panels(varmatrix, scale=T, cex.cor = 1.5)
+dev.off()
 ```

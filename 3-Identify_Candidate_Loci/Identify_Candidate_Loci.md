@@ -113,6 +113,51 @@ library(venn)
 
 variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
 
+## Manhattan plotting of Bayes Factors of SNPs
+
+for (k in 1:length(variables)){
+
+ # Variable:
+ var=variables[k]
+
+ # Empty SNPs dataframe to fill
+ snps.table <- data.frame()
+ 
+ # Fill SNPs dataframe with all BayPass results for the variable
+ for (n in 1:50){
+  # upload the dataset table:
+  var.snp=read.table(paste0("3-Identify_Candidate_Loci/tables/BayPass_OutPut/AUX_",
+                            var,"_",n,"_summary_betai.out"),h=T)
+  
+  # calculate the SNP database number sequence (1 every 50) 
+  # NOTE: 2100553 is the total number of SNPs in all datasets
+  var.snp <- data.frame(var.snp, SNPnum = seq(n, 2100553, by = 50))
+  
+  # add the dataset rows to the total snps table
+  snps.table <- rbind(snps.table, var.snp)
+ }
+ # order the table based on the SNP number
+ snps.table <- snps.table %>% arrange(SNPnum)
+ 
+ # Add SNP ID information from SNPIDs table
+ SNPIDs <- read_tsv("3-Identify_Candidate_Loci/tables/BayPass_OutPut/finalset.maf5pc.SNPIDs",
+                    col_names = F)[,2-3] %>%
+    rename("scaffold" =  X2, "position" = X3)
+  
+ # Add SNP IDs to the total snps table
+ snps.table <- data.frame(snps.table,SNPIDs)
+
+ # plot
+ p <- ggplot() +
+   geom_point(data=snps.table, aes(x=SNPnum, y=BF.dB.), fill="grey32", shape=21, size=1) +
+   theme_minimal()
+ 
+ ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/BFs_", var, "_manplot.pdf"),  width = 14,
+     height = 4)
+ 
+}
+
+
 ## Manhattan plotting outlier and candidate windows ##
 
 for (k in 1:length(variables)){
@@ -200,9 +245,10 @@ dev.off()
 
 ## Plotting INVERSION
 
-
 ```{R}
 library(tidyverse)
+
+## For BayPass results:
 
 variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
 
@@ -245,5 +291,22 @@ for (k in 1:length(variables)){
    theme_minimal()
  ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_", var, "_manplot.pdf"),  width = 14,
      height = 4)
+}
+
+## For RDA results
+
+rda.loadings <- read_tsv("3-Identify_Candidate_Loci/tables/rda_loadings_sigaxes.tsv",
+                    col_names = T)
+
+rda.loadings.final <- data.frame()
+
+for (n in 1:length(rda.loadings$SNP)){
+  print(n)
+  snp.row <- rda.loadings[n,]
+  snp <- rda.loadings$SNP[n]
+  SCAF <- strsplit(snp, split = ":")[[1]][1]
+  POS <- (strsplit(strsplit(snp, split = ":")[[1]][2], split = "_"))[[1]][1]
+  row <- data.frame(scaffold=SCAF, position=POS, RDA1=snp.row$RDA1, RDA2=snp.row$RDA2, RDA3=snp.row$RDA3)
+  rda.loadings.final <- rbind(rda.loadings.final, row)
 }
 ```
