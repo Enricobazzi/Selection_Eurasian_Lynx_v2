@@ -165,3 +165,49 @@ pdf(file = paste0("2-Prepare_Environmental_Data/plots/uncorrelated_variables_pai
 pairs.panels(varmatrix, scale=T, cex.cor = 1.5)
 dev.off()
 ```
+Correlation of variables across the whole distributional range
+```{R}
+library(raster)
+library(rgdal)
+library(grDevices)
+library(sf)
+library(viridis)
+library(RColorBrewer)
+library(dismo)
+
+# Create raster with all variables
+worldclim <- getData("worldclim", var = "bio", res = 10)
+jan_mean_depth <- raster("2-Prepare_Environmental_Data/tables/jan_mean_depth.tif")
+jan_mean_depth_new <- projectRaster(jan_mean_depth, worldclim)
+mean_snow_days <- raster("2-Prepare_Environmental_Data/tables/mean_snow_days.tif")
+mean_snow_new <- projectRaster(mean_snow_days, worldclim)
+
+clim.layer <- stack(worldclim,jan_mean_depth_new,mean_snow_new)
+extent <- c(-10, 180, 20, 90) 
+
+data.crop <- crop(clim.layer, extent)
+
+# crop for distributional range only
+distr.map <- readOGR("~/Downloads/redlist_species_data_1f4a1a8f-31fa-48ee-8678-7435f90a8ff9/data_0.shp")
+r2 <- crop(data.crop, extent(distr.map))
+r3 <- mask(r2, distr.map)
+ext <- extent(r3)
+
+#To create 1000 random points
+set.seed(123)
+backgr <- randomPoints(r3, 1000, ext=ext)
+backgrvals <- data.frame(extract(r3, backgr))
+
+#To plot it you can use
+plot(r3[[1]])
+points(backgr, col='black')
+
+# Correlation plots
+pairs.panels(backgrvals, scale=T, cex.cor = 6)
+
+usdm::vifcor(backgrvals, th=10)
+varmatrix_short <- varmatrix2[,c(1,2,7,6,5,8,9,11,13,14,15,17,20,21)]
+
+# final set of variables - loose
+vif_func(backgrvals, trace =T, thresh = 4)
+```

@@ -121,10 +121,17 @@ dev.off()
 
 plot(gdm, plot.layout = c(2, 5))
 plot(gdm)
+
 pdf(file = paste0("4-Downstream_Analyses/plots/GDM_effect_uncertainty.pdf"),
     width = 8,
     height = 8)
+
+# pdf(file = paste0("4-Downstream_Analyses/plots/GDM_effect_uncertainty_allvars.pdf"),
+#     width = 8,
+#     height = 8)
+
 plotUncertainty(gdm.input, sampleSites=0.70, bsIters=100, geo=T, plot.layout=c(2,4))
+
 dev.off()
 ```
 Transform climate data layers based on modeled results:
@@ -180,6 +187,7 @@ mean_snow_new <- projectRaster(mean_snow_days, worldclim)
 
 # combine layers
 clim.layer <- stack(DEM2,DEM5,DEM6,DEM8,DEM13,jan_mean_depth_new,mean_snow_new)
+clim.layer <- stack(worldclim,jan_mean_depth_new,mean_snow_new)
 
 extent <- c(-10, 180, 20, 90) 
 clim.layer.crop <- crop(clim.layer, extent)
@@ -375,7 +383,12 @@ bg <- cols <- c("#A035AF",
                 brewer.pal(12,"Paired")[5],
                 brewer.pal(12,"Paired")[6])
 
+pca.rast.crop <- crop(pca.rast, extent)
+plotRGB(pca.rast.crop, r=1, g=2, b=3, bgalpha=0, integrate=T)
+
 pdf("4-Downstream_Analyses/plots/cool_RGBmap.pdf", width = 14)
+# pdf("4-Downstream_Analyses/plots/cool_RGBmap_allvars.pdf", width = 14)
+
 plotRGB(pca.rast.crop, r=1, g=2, b=3, bgalpha=0, alpha=180, integrate=T)
 plotRGB(r3, r=1, g=2, b=3, bgalpha=0, integrate=T, add=T)
 plot(distr.map, lwd=1.5, add=T)
