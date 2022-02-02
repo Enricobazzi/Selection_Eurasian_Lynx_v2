@@ -118,7 +118,7 @@ Reitarative VIF method
 # all variables
 varmatrix_short <- varmatrix2[,c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)]
 # all competing variables (removed 3,4,10,12,13,16,18 for reasons mentioned above)
-varmatrix_short <- varmatrix2[,c(1,2,7,6,5,8,9,11,13,14,15,17,20,21)]
+varmatrix_short <- varmatrix2[,c(1,2,7,6,5,8,9,11,13,14,15,17,20,21,3,4)]
 
 # manually do by removing highest VIF from c() or use function below (depends on order of columns) 
 varmatrix_short <- varmatrix2[,c(1,2,7,6,5,8,9,11,13,14,15,17,20,21)]
@@ -174,6 +174,15 @@ library(sf)
 library(viridis)
 library(RColorBrewer)
 library(dismo)
+library(tidyverse)
+library("Hmisc")
+library(corrplot)
+library(viridis)
+library(psych)
+library(VIF)
+library(fmsb)
+library(usdm)
+
 
 # Create raster with all variables
 worldclim <- getData("worldclim", var = "bio", res = 10)
@@ -183,13 +192,12 @@ mean_snow_days <- raster("2-Prepare_Environmental_Data/tables/mean_snow_days.tif
 mean_snow_new <- projectRaster(mean_snow_days, worldclim)
 
 clim.layer <- stack(worldclim,jan_mean_depth_new,mean_snow_new)
-extent <- c(-10, 180, 20, 90) 
 
-data.crop <- crop(clim.layer, extent)
-
-# crop for distributional range only
+# crop for distributional range only - depe
 distr.map <- readOGR("~/Downloads/redlist_species_data_1f4a1a8f-31fa-48ee-8678-7435f90a8ff9/data_0.shp")
-r2 <- crop(data.crop, extent(distr.map))
+distr.map <- readOGR("~/Downloads/redlist_species_data_5a932080-5312-4e23-b0d3-929acfb17324/data_0.shp")
+
+r2 <- crop(clim.layer, extent(distr.map))
 r3 <- mask(r2, distr.map)
 ext <- extent(r3)
 
@@ -203,11 +211,26 @@ plot(r3[[1]])
 points(backgr, col='black')
 
 # Correlation plots
-pairs.panels(backgrvals, scale=T, cex.cor = 6)
+pdf(file = paste0("2-Prepare_Environmental_Data/plots/all_variables_pairs.panels.pdf"),
+    width = 13,
+    height = 8)
+pairs.panels(backgrvals, scale=T, cex.cor = 1.5)
+dev.off()
+# The following "groups" of r>0.7
+# 1,4,6,7,9,11
+# 2,14,15,17,19(not with 2)
+# 5,10
+# 8
+# 13,16,18
+# 3 -> only with 4 - weird being with only one from one group but not rest
+# 12 -> with 13,14,16,17 + 0.69 with 18,19 - weird being with more than 1 group
+# snow variables highly correlated across range
+# of these groups our sample data VIF selection has selected one candidate from each
+# except for bio3
 
 usdm::vifcor(backgrvals, th=10)
-varmatrix_short <- varmatrix2[,c(1,2,7,6,5,8,9,11,13,14,15,17,20,21)]
+varmatrix_short <- as.matrix(backgrvals[,c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)])
 
 # final set of variables - loose
-vif_func(backgrvals, trace =T, thresh = 4)
+vif_func(varmatrix_short, trace=T, thresh = 4)
 ```
