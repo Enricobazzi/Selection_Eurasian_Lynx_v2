@@ -100,7 +100,7 @@ gdm <- gdm(gdm.input, geo = T, splines = NULL, knots = NULL)
 summary(gdm)
 gdm$explained
 
-gdm.importance <- gdm.varImp(gdm.input, geo=T, nPerm=100, parallel=TRUE, cores=32)
+gdm.importance <- gdm.varImp(gdm.input, geo=T, nPerm=50, parallel=TRUE, cores=8)
 
 pdf(file = paste0("4-Downstream_Analyses/plots/GDM_importance.pdf"),
     width = 8,
