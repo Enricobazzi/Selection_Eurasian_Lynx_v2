@@ -234,3 +234,20 @@ varmatrix_short <- as.matrix(backgrvals[,c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1
 # final set of variables - loose
 vif_func(varmatrix_short, trace=T, thresh = 4)
 ```
+
+## PCA of samples based on variables
+
+```{R}
+library(tidyverse)
+
+varmatrix <- read_tsv("2-Prepare_Environmental_Data/WorldClim_table_persample.tsv") %>%
+  column_to_rownames(., var="sample")
+snowdata <- read_tsv("2-Prepare_Environmental_Data/Snow_table_persample.tsv") %>%
+  column_to_rownames(., var="sample")
+var.data <- cbind(varmatrix, snowdata)
+matr_samples <- t(as.matrix(cbind(varmatrix, snowdata)))
+
+pca <- prcomp(var.data, scale=T)
+pca$rotation
+
+```
