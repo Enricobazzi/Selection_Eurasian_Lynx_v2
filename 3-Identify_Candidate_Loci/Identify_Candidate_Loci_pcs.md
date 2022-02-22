@@ -1,13 +1,13 @@
 ---
-title: "Identify_Candidate_Loci"
+title: "Identify_Candidate_Loci_pcs"
 author: "Enrico"
-date: "23/11/2021"
+date: "2/18/2022"
 output: html_document
 editor_options:
   chunk_output_type: console
 ---
 
-The strategy adopted to identify loci under selection is a Genome Environment Association (GEA) analysis.
+The strategy adopted to identify loci under selection is a Genome Environment Association (GEA) analysis using the first 5 axes of the PCA of environmental variables as independent predictors.
 
 ## Redundancy Analysis (RDA)
 
@@ -18,13 +18,13 @@ I followed a few tutorials made to guide through the different steps of GEA and 
 https://popgen.nescent.org/2018-03-27_RDA_GEA.html
 https://bookdown.org/hhwagner1/LandGenCourse_book/WE-11.html
 
-See RDA.md for details on how the analysis was run and its outputs.
+See RDA_pcs.md for details on how the analysis was run and its outputs.
 
 ## Univariate GEA with BayPass
 
-In order to reduce false positive rates and add a control for population structure (RDA does not control for it), I have run univariate analysis using the software BayPass v2.1. See BayPass.md for details on how the analysis was run and its outputs.
+In order to reduce false positive rates and add a control for population structure (RDA does not control for it), I have run univariate analysis using the software BayPass v2.1. See BayPass_pcs.md for details on how the analysis was run and its outputs.
 
-BayPass results, in the form of SNPs Bayes Factors, have been used to generate a set of candidate genomic windows, using the software GenWin. See GenWin.md for details on how the analysis was run and its outputs.
+BayPass results, in the form of SNPs Bayes Factors, have been used to generate a set of candidate genomic windows, using the software GenWin. See GenWin_pcs.md for details on how the analysis was run and its outputs.
 
 ## Intersecting results to obtain candidate windows and SNPs
 
@@ -34,76 +34,89 @@ By intersecting our RDA results with the genomic windows identified by BayPass, 
 # On genomics-a server
 cd /home/ebazzicalupo/Selection_Eurasian_Lynx/Intersect
 
-for var in bio2 bio5 bio6 bio8 bio13 jan_depth snow_days
+for var in PC1 PC2 PC3 PC4 PC5
  do
-  echo "${var}"
-  bedtools intersect -a ../RDA/rda_candidate_snps.bed -b ../GenWin/${var}_GenWin_windows_outliers.bed \
-   > ${var}_intersect_candidate_snps.bed
-  bedtools intersect -wa -a ../GenWin/${var}_GenWin_windows_outliers.bed -b ../RDA/rda_candidate_snps.bed | uniq \
-   > ${var}_intersect_candidate_windows.bed
-  nsnps=($(wc -l <${var}_intersect_candidate_snps.bed))
-  nwindows=($(wc -l <${var}_intersect_candidate_windows.bed))
-  winlength=($(awk -F'\t' 'BEGIN{SUM=0}{ SUM+=$3-$2 }END{print SUM}' ${var}_intersect_candidate_windows.bed))
+  bedtools intersect -a ../RDA/rda_candidate_fivepcs_snps.bed -b ../GenWin/${var}_GenWin_windows_outliers.bed \
+   > ${var}_intersect_candidate_fivepcs_snps.bed
+  bedtools intersect -wa -a ../GenWin/${var}_GenWin_windows_outliers.bed -b ../RDA/rda_candidate_fivepcs_snps.bed | uniq \
+   > ${var}_intersect_candidate_fivepcs_windows.bed
+  nsnps=($(wc -l <${var}_intersect_candidate_fivepcs_snps.bed))
+  nwindows=($(wc -l <${var}_intersect_candidate_fivepcs_windows.bed))
+  winlength=($(awk -F'\t' 'BEGIN{SUM=0}{ SUM+=$3-$2 }END{print SUM}' ${var}_intersect_candidate_fivepcs_windows.bed))
   echo "${var} has a total of ${nsnps} candidate SNPs, a total of ${nwindows} candidate genomic windows \
   spanning a total of ${winlength} bps"
 done
-cat *_intersect_candidate_snps.bed | sort -k 1,1 -k2,2n | uniq > total_intersect_candidate_snps.bed
-cat *_intersect_candidate_windows.bed | sort -k 1,1 -k2,2n | uniq | bedtools merge -i - > total_intersect_candidate_windows.bed
+cat *_intersect_candidate_fivepcs_snps.bed | sort -k 1,1 -k2,2n | uniq \
+ > total_intersect_candidate_fivepcs_snps.bed
+cat *_intersect_candidate_fivepcs_windows.bed | sort -k 1,1 -k2,2n | uniq | bedtools merge -i - \
+ > total_intersect_candidate_fivepcs_windows.bed
 ```
-bio2 has a total of 1696 candidate SNPs, a total of 326 candidate genomic windows spanning a total of 7240000 bps
-bio5 has a total of 1754 candidate SNPs, a total of 334 candidate genomic windows spanning a total of 7720000 bps
-bio6 has a total of 2193 candidate SNPs, a total of 369 candidate genomic windows spanning a total of 8210000 bps
-bio8 has a total of 1567 candidate SNPs, a total of 307 candidate genomic windows spanning a total of 6740000 bps
-bio13 has a total of 824 candidate SNPs, a total of 274 candidate genomic windows spanning a total of 6610000 bps
-jan_depth has a total of 4540 candidate SNPs, a total of 622 candidate genomic windows spanning a total of 13950000 bps
-snow_days has a total of 3518 candidate SNPs, a total of 505 candidate genomic windows spanning a total of 10910000 bps
+PC1 has a total of 1813 candidate SNPs, a total of 320 candidate genomic windows spanning a total of 7480000 bps
+PC2 has a total of 1547 candidate SNPs, a total of 334 candidate genomic windows spanning a total of 7500000 bps
+PC3 has a total of 2701 candidate SNPs, a total of 484 candidate genomic windows spanning a total of 11320000 bps
+PC4 has a total of 872 candidate SNPs, a total of 268 candidate genomic windows spanning a total of 6160000 bps
+PC5 has a total of 5217 candidate SNPs, a total of 715 candidate genomic windows spanning a total of 15040000 bps
 
-total candidate SNPs : 10791
-total candidate genomic windows : 1620
-total length of candidate genomic windows : 49.19 Mbp
+total candidate SNPs : 9871
+total candidate genomic windows : 1427
+total length of candidate genomic windows : 42.27 Mbp
 
-To get the TOPSNP of each candidate window:
+## Get the TOPSNP of each candidate window
+
+Top SNPs for candidate windows of each PC were extracted (see GenWin_pcs.md). To put together all of them into a single file:
 ```{bash}
 # on genomics-a:
 cd /home/ebazzicalupo/Selection_Eurasian_Lynx/
 
 # get topsnps from all uncorrelated predictors
-rm Intersect/uncorvars_topsnps.range
-for var in bio2 bio5 bio6 bio8 bio13 jan_depth snow_days
+rm Intersect/fivepcs_topsnps.range
+for var in PC1 PC2 PC3 PC4 PC5
  do
   echo "${var}"
-  cat GenWin/${var}_topsnps.range >> Intersect/uncorvars_topsnps.range
+  cat GenWin/${var}_topsnps.range >> Intersect/fivepcs_topsnps.range
 done
 ```
-Problem = more than one topsnp for each candidate window (window is same topsnp is different because from different variable or originally window was split in 2)
+Problem = there are more than one "topsnp" for each candidate window (either consecutive windows with different "topsnps" were joined, or the window is the same but the "topsnp" is different for different PCs)
 Solution = get topsnps from each candidate window with only one topnsp and then get one random topsnp from each window with more than one
+
+First we have to join all the windows from the inversion (see GenWin_pcs.md to see how they were defined):
+between 17635000 and 18355000 of scaffold "scaffold_17_arrow_ctg1"
+
+I manually modified "total_intersect_candidate_fivepcs_windows.bed" to have a single window for the inversion using nano - resulting in a total of 1422 unique windows down from 1427 (6 windows in the inversion)
+
+Then I can run:
 ```{bash}
 cd /home/ebazzicalupo/Selection_Eurasian_Lynx/Intersect
 
 # get list of candidate windows with ONE topsnp
-bedtools intersect -wo -a total_intersect_candidate_windows.bed \
- -b <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) |
- cut -f1,2,3 | uniq -u > topsnps_nodupwindows.bed
+bedtools intersect -wo -a total_intersect_candidate_fivepcs_windows.bed \
+ -b <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) |
+ cut -f1,2,3 | uniq -u > topsnps_fivepcs_nodupwindows.bed
  
 # get topsnp from each window with ONE topsnp
-bedtools intersect -a <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) \
- -b topsnps_nodupwindows.bed > topsnps_nodupwindows_onesnp.bed
+bedtools intersect -a <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) \
+ -b topsnps_fivepcs_nodupwindows.bed > topsnps_fivepcs_nodupwindows_onesnp.bed
 
 # get list of candidate windows with MORE than one topsnp
-bedtools intersect -wo -a total_intersect_candidate_windows.bed \
- -b <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) |
- cut -f1,2,3 | uniq -d > topsnps_dupwindows.bed
+bedtools intersect -wo -a total_intersect_candidate_fivepcs_windows.bed \
+ -b <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) |
+ cut -f1,2,3 | uniq -d > topsnps_fivepcs_dupwindows.bed
 
 # get only one topsnp for each of the windows with duplicates
 while read p; do
-  bedtools intersect -a <(cat uncorvars_topsnps.range | sort -k 1,1 -k2,2n) -b <(echo "$p") | shuf -n 1
-done < topsnps_dupwindows.bed > topsnps_dupwindows_onerand.bed
+  bedtools intersect -a <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) -b <(echo "$p") | shuf -n 1
+done < topsnps_fivepcs_dupwindows.bed > topsnps_fivepcs_dupwindows_onerand.bed
 
 # get full list of topsnps (only one per window)
-cat topsnps_nodupwindows_onesnp.bed topsnps_dupwindows_onerand.bed | sort -k 1,1 -k2,2n \
- > total_intersect_candidate_windows_topsnps.bed
+cat topsnps_fivepcs_nodupwindows_onesnp.bed topsnps_fivepcs_dupwindows_onerand.bed | sort -k 1,1 -k2,2n \
+ > total_intersect_candidate_fivepcs_windows_topsnps.bed
 ```
-Total of 1610 topsnps found from 1610 unique candidate windows - although initially 1620 candidate windows, 11 of them are from the inversion so only 1 SNP will be extracted from them
+Total of 1422 topsnps found from 1422 unique candidate windows
+
+Download results to laptop
+```{bash}
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Intersect/total_intersect_candidate_fivepcs_windows.bed ~/Documents/Selection_Eurasian_Lynx_v2/3-Identify_Candidate_Loci/tables/
+```
 
 ## Plotting results
 
@@ -111,7 +124,7 @@ Total of 1610 topsnps found from 1610 unique candidate windows - although initia
 library(tidyverse)
 library(venn)
 
-variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
+variables <- c("PC1", "PC2", "PC3", "PC4", "PC5")
 
 ## Manhattan plotting of Bayes Factors of SNPs
 
@@ -198,7 +211,7 @@ for (k in 1:length(variables)){
 
 ## Plot intersections with Venn Diagrams ##
 
-variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
+variables <- c("PC1", "PC2", "PC3", "PC4", "PC5")
 
 v.list <- list()
 
@@ -232,7 +245,7 @@ for (k in 1:length(variables)){
 }
 length(unique(unlist(v.list)))
 
-pdf(file = paste0("3-Identify_Candidate_Loci/plots/intersect_venn_diagram.pdf"),
+pdf(file = paste0("3-Identify_Candidate_Loci/plots/intersect_fivepcs_venn_diagram.pdf"),
     width = 8,
     height = 8)
 venn(v.list, snames = variables, 
@@ -250,7 +263,6 @@ library(tidyverse)
 
 ## For BayPass results:
 
-variables <- c("bio2", "bio5", "bio6", "bio8", "bio13", "jan_depth", "snow_days")
 variables <- c("PC1", "PC2", "PC3", "PC4", "PC5")
 
 for (k in 1:length(variables)){

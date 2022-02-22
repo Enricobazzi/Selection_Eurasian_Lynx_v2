@@ -239,15 +239,163 @@ vif_func(varmatrix_short, trace=T, thresh = 4)
 
 ```{R}
 library(tidyverse)
+library(FactoMineR)
+library(factoextra)
+library(corrplot)
+library(viridis)
+library(RColorBrewer)
 
 varmatrix <- read_tsv("2-Prepare_Environmental_Data/WorldClim_table_persample.tsv") %>%
   column_to_rownames(., var="sample")
 snowdata <- read_tsv("2-Prepare_Environmental_Data/Snow_table_persample.tsv") %>%
   column_to_rownames(., var="sample")
 var.data <- cbind(varmatrix, snowdata)
-matr_samples <- t(as.matrix(cbind(varmatrix, snowdata)))
 
-pca <- prcomp(var.data, scale=T)
-pca$rotation
+row.names(var.data)
+samples_to_remove <- c("c_ll_ba_0216","c_ll_ba_0233","c_ll_cr_0211","h_ll_ba_0214","h_ll_ba_0215","c_ll_no_0065", "c_ll_no_0075",
+                       "c_ll_no_0076", "c_ll_no_0077", "c_ll_no_0078", "c_ll_no_0079", "c_ll_no_0080", "c_ll_no_0081", "c_ll_no_0082",
+                       "c_ll_vl_0137", "c_ll_og_0181", "c_ll_og_0187", "c_ll_cr_0205", "c_ll_cr_0206", 
+                       "c_ll_cr_0207", "c_ll_cr_0208", "c_ll_cr_0209", "c_ll_cr_0212", "c_ll_ba_0224", "c_ll_ba_0226",
+                       "c_ll_ba_0227", "c_ll_ba_0228", "c_ll_ba_0229", "c_ll_ba_0230", "c_ll_tu_0154",
+                       "c_ll_po_0001", "c_ll_po_0002", "c_ll_po_0003", "c_ll_po_0011", "c_ll_po_0014", "c_ll_po_0019",
+                       "c_ll_po_0105", "c_ll_po_0106", "c_ll_po_0150")
 
+var.data <- var.data[!(row.names(var.data) %in% samples_to_remove),]
+
+loc <- rep(NA, NROW(var.data))
+loc[grep("ba", rownames(var.data))] <- "Balkans"
+loc[grep("ca", rownames(var.data))] <- "Caucasus"
+loc[grep("cr", rownames(var.data))] <- "Carpathians"
+loc[grep("ka", rownames(var.data))] <- "Mongolia"
+loc[grep("ki", rownames(var.data))] <- "Kirov"
+loc[grep("la", rownames(var.data))] <- "Latvia"
+loc[grep("no", rownames(var.data))] <- "Norway"
+loc[grep("po", rownames(var.data))] <- "NE-Poland"
+loc[grep("og", rownames(var.data))] <- "Mongolia"
+loc[grep("to", rownames(var.data))] <- "Mongolia"
+loc[grep("tu", rownames(var.data))] <- "Tuva"
+loc[grep("ur", rownames(var.data))] <- "Urals"
+loc[grep("vl", rownames(var.data))] <- "Vladivostok"
+loc[grep("ya", rownames(var.data))] <- "Yakutia"
+
+num <- rep(NA, NROW(var.data))
+num[grep("ba", rownames(var.data))] <- 1
+num[grep("ca", rownames(var.data))] <- 3
+num[grep("cr", rownames(var.data))] <- 2
+num[grep("ka", rownames(var.data))] <- 6
+num[grep("ki", rownames(var.data))] <- 4
+num[grep("la", rownames(var.data))] <- 5
+num[grep("no", rownames(var.data))] <- 8
+num[grep("po", rownames(var.data))] <- 7
+num[grep("og", rownames(var.data))] <- 6
+num[grep("to", rownames(var.data))] <- 6
+num[grep("tu", rownames(var.data))] <- 9
+num[grep("ur", rownames(var.data))] <- 10
+num[grep("vl", rownames(var.data))] <- 11
+num[grep("ya", rownames(var.data))] <- 12
+
+ola <- data.frame(sample = rownames(var.data), pop = loc, n = num)
+
+bg <- cols <- c("#A035AF",
+                brewer.pal(12,"Paired")[9],
+                "#B8860b",
+                viridis_pal()(5)[1],
+                brewer.pal(12,"Paired")[3],
+                brewer.pal(12,"Paired")[7],
+                viridis_pal()(5)[3],
+                viridis_pal()(5)[2],
+                brewer.pal(12,"Paired")[8],
+                "#0F4909",
+                brewer.pal(12,"Paired")[5],
+                brewer.pal(12,"Paired")[6])
+
+
+pca <- PCA(var.data, scale.unit = TRUE, ncp = 5, graph = TRUE)
+
+fviz_eig(pca, addlabels = TRUE, ylim = c(0, 60))
+
+# cos2 (quality of representation) of each variable
+# if only 2 PCs (~70% of variance)
+fviz_cos2(pca, choice = "var", axes = 1:2)
+# if only 3 PCs (~80% of variance)
+fviz_cos2(pca, choice = "var", axes = 1:3)
+# if 5 PCs (~95% of variance)
+fviz_cos2(pca, choice = "var", axes = 1:5)
+
+
+# Color by cos2 values: quality on the factor map
+fviz_pca_var(pca, col.var = "cos2", axes = 2:3, 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+             )
+var <- get_pca_var(pca)
+corrplot(var$contrib, is.corr=FALSE)
+
+# Contributions of variables to PC1
+fviz_contrib(pca, choice = "var", axes = 1, top = 21)
+# Contributions of variables to PC2
+fviz_contrib(pca, choice = "var", axes = 2, top = 21)
+# Contributions of variables to PC3
+fviz_contrib(pca, choice = "var", axes = 3, top = 21)
+# Contributions of variables to PC4
+fviz_contrib(pca, choice = "var", axes = 4, top = 21)
+# Contributions of variables to PC5
+fviz_contrib(pca, choice = "var", axes = 5, top = 21)
+
+desc <- dimdesc(pca, axes = c(1,2,3,4,5), proba = 0.05)
+desc$Dim.1
+desc$Dim.2
+desc$Dim.3
+desc$Dim.4
+desc$Dim.5
+
+ind <- get_pca_ind(pca)
+
+# EXTRACT TABLE OF PC VALUES of each sample
+twopcs.dataframe <- data.frame(PC1=ind$coord[,1], PC2=ind$coord[,2]) %>%
+                     rownames_to_column("sample")
+
+write_tsv(twopcs.dataframe, "2-Prepare_Environmental_Data/twopcs_data_matrix.tsv")
+
+
+fivepcs.dataframe <- data.frame(PC1=ind$coord[,1], PC2=ind$coord[,2], PC3=ind$coord[,3], 
+                                PC4=ind$coord[,4], PC5=ind$coord[,5]) %>%
+                     rownames_to_column("sample")
+
+write_tsv(fivepcs.dataframe, "2-Prepare_Environmental_Data/fivepcs_data_matrix.tsv")
+
+# EXTRACT TABLE OF PC VALUES for each population
+# change the order of the columns so that they are in alphabetical order 
+# (as in allele counts file: ca - ki - la - mo - tu - ur - vl - ya)
+populations <- c("ca", "ki", "la", "mo", "tu", "ur", "vl", "ya")
+final.table <- data.frame(variable=c("PC1", "PC2", "PC3", "PC4", "PC5"))
+for(p in 1:length(populations)){
+  # population
+  POP <- populations[p]
+  if (POP=="mo"){
+    pop.sample.n <- grep("ka|og|to", rownames(ind$coord))
+  } else {
+  # rows of population
+  pop.sample.n <- grep(POP, rownames(ind$coord))
+  }
+  # create a table just for the population adding samples one by one
+  pop.table <- data.frame()
+  for(n in 1:length(pop.sample.n)){
+    N <- pop.sample.n[n]
+    row <- data.frame(PC1=ind$coord[N,1], PC2=ind$coord[N,2], PC3=ind$coord[N,3], 
+                                PC4=ind$coord[N,4], PC5=ind$coord[N,5])
+    pop.table <- rbind(pop.table, row)
+  }
+  # get mean value of population for each PC population's v
+  pc1.mean <- mean(pop.table$PC1)
+  pc2.mean <- mean(pop.table$PC2)
+  pc3.mean <- mean(pop.table$PC3)
+  pc4.mean <- mean(pop.table$PC4)
+  pc5.mean <- mean(pop.table$PC5)
+  pop.column.vals <- c(pc1.mean, pc2.mean, pc3.mean, pc4.mean, pc5.mean)
+  final.table <- cbind(final.table, data.frame(V=pop.column.vals))
+}
+colnames(final.table) <- c("variable", populations)
+
+write_tsv(final.table, "2-Prepare_Environmental_Data/fivepcs_populations_data_matrix.tsv")
 ```
