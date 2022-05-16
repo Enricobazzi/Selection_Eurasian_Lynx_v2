@@ -73,7 +73,7 @@ rm Intersect/fivepcs_topsnps.range
 for var in PC1 PC2 PC3 PC4 PC5
  do
   echo "${var}"
-  cat GenWin/${var}_topsnps.range >> Intersect/fivepcs_topsnps.range
+  cat GenWin/${var}_topsnps.range | cut -f1,2,3,5 >> Intersect/fivepcs_topsnps.range
 done
 ```
 Problem = there are more than one "topsnp" for each candidate window (either consecutive windows with different "topsnps" were joined, or the window is the same but the "topsnp" is different for different PCs)
@@ -90,21 +90,21 @@ cd /home/ebazzicalupo/Selection_Eurasian_Lynx/Intersect
 
 # get list of candidate windows with ONE topsnp
 bedtools intersect -wo -a total_intersect_candidate_fivepcs_windows.bed \
- -b <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) |
+ -b <(cat fivepcs_topsnps.range | grep -v "NA" | sort -k 1,1 -k2,2n) |
  cut -f1,2,3 | uniq -u > topsnps_fivepcs_nodupwindows.bed
  
 # get topsnp from each window with ONE topsnp
-bedtools intersect -a <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) \
+bedtools intersect -a <(cat fivepcs_topsnps.range | grep -v "NA" | sort -k 1,1 -k2,2n) \
  -b topsnps_fivepcs_nodupwindows.bed > topsnps_fivepcs_nodupwindows_onesnp.bed
 
 # get list of candidate windows with MORE than one topsnp
 bedtools intersect -wo -a total_intersect_candidate_fivepcs_windows.bed \
- -b <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) |
+ -b <(cat fivepcs_topsnps.range | grep -v "NA" | sort -k 1,1 -k2,2n) |
  cut -f1,2,3 | uniq -d > topsnps_fivepcs_dupwindows.bed
 
 # get only one topsnp for each of the windows with duplicates
 while read p; do
-  bedtools intersect -a <(cat fivepcs_topsnps.range | sort -k 1,1 -k2,2n) -b <(echo "$p") | shuf -n 1
+  bedtools intersect -a <(cat fivepcs_topsnps.range | grep -v "NA" | sort -k 1,1 -k2,2n) -b <(echo "$p") | shuf -n 1
 done < topsnps_fivepcs_dupwindows.bed > topsnps_fivepcs_dupwindows_onerand.bed
 
 # get full list of topsnps (only one per window)
@@ -116,6 +116,85 @@ Total of 1422 topsnps found from 1422 unique candidate windows
 Download results to laptop
 ```{bash}
 scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/Intersect/total_intersect_candidate_fivepcs_windows.bed ~/Documents/Selection_Eurasian_Lynx_v2/3-Identify_Candidate_Loci/tables/
+```
+
+## Extract Neutral Loci
+
+To extract only neutral SNPs I will filter the VCF file to remove any candidate regions and all of the genes genes.
+
+Genes regions were identified by Dani as follows:
+```{bash}
+cd /GRUPOS/grupolince/reference_genomes/lynx_canadensis
+
+awk -F"\t" '$3 == "gene" {printf ("%s\t%s\t%s\n", $1, $4-5001, $5+5000)}' lc4.NCBI.nr_main.gff3 \
+ > lc4.NCBI.nr_main.genes.plus5000.temp_bed
+
+join -1 1 -2 1 <(LANG=en_EN sort -k1,1 -k2,2n -k3,3n lc_ref_all_the_genome.bed) \
+ <(LANG=en_EN sort -k1,1 -k2,2n -k3,3n lc4.NCBI.nr_main.genes.plus5000.temp_bed) | 
+ awk -v OFS='\t' '{if ($4<0) {$4="1"} else {$4=$4}; print}' | 
+ awk -v OFS='\t' '{if ($5>$3) {$5=$3} else {$5=$5}; print $1,$4,$5}' | 
+ bedtools merge -i stdin -d 1 > lc4.NCBI.nr_main.genes.plus5000.bed
+
+rm lc4.NCBI.nr_main.genes.plus5000.temp_bed
+```
+Remove those regions from the VCF
+```{bash}
+# on genomics-a
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/VCF
+
+bedtools subtract -header -a ll_wholegenome_LyCa_ref.sorted.filter7.vcf \
+ -b /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.NCBI.nr_main.genes.plus5000.bed \
+ > ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.vcf
+```
+From 4983054 whole genome SNPs to 2476154 intergenic SNPs.
+
+Now remove also any candidate of selection - the SNPs from the RDA and the GenWin windows from BayPass
+```{bash}
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/
+# create a new VCF to substract from sequentially
+cp VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.vcf \
+ VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf
+ 
+# Subtract GenWin windows sequentially from new VCF
+for var in PC1 PC2 PC3 PC4 PC5
+ do
+  echo "filtering ${var} regions"
+  bedtools subtract -header -a VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+   -b GenWin/${var}_GenWin_windows_outliers.bed \
+   > tmp && mv tmp VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf
+done
+
+# Subtract RDA SNPs from new VCF
+bedtools subtract -header -a VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+ -b RDA/rda_candidate_fivepcs_snps.bed \
+ > tmp && mv tmp VCF/ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf
+```
+We have a total of 2266071 non-selected intergenic SNPs
+
+Now to create a RAW file of a subset of 1500 with plink
+```{bash}
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/VCF/
+# I manually created a file listing samples to remove for plink with following format:
+# c_ll_ba_0216 c_ll_ba_0216 0 0 0 -9
+# c_ll_ba_0233 c_ll_ba_0233 0 0 0 -9
+# c_ll_cr_0211 c_ll_cr_0211 0 0 0 -9
+# h_ll_ba_0214 h_ll_ba_0214 0 0 0 -9
+# h_ll_ba_0215 h_ll_ba_0215 0 0 0 -9
+
+# prune snps based on ld (VIF < 2) - no missing data - maf 0.05
+plink_1.9 --vcf ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+--double-id --allow-extra-chr --set-missing-var-ids @:# --geno 0 --maf 0.05 \
+--remove samplestoremove.txt --indep 100 10 2
+
+# Extract RAW file
+plink_1.9 --vcf ll_wholegenome_LyCa_ref.sorted.filter7.intergenic.noselection.vcf \
+ --double-id --allow-extra-chr --set-missing-var-ids @:# \
+ --remove samplestoremove.txt --extract <(shuf --random-source=<(yes 42) plink.prune.in | head -n 1500) \
+ --recode A --out intergenic_neutral_snps
+```
+Copy to laptop
+```{bash}
+scp ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/VCF/intergenic_neutral_snps.raw Documents/Selection_Eurasian_Lynx_v2/4-Downstream_Analyses/tables/
 ```
 
 ## Plotting results
@@ -208,6 +287,44 @@ for (k in 1:length(variables)){
      height = 4)
  
 }
+
+## Resume GenWin results - windowlength and nsnps overlap ##
+
+variables <- c("PC1", "PC2", "PC3", "PC4", "PC5")
+
+resume_genwin_df <- data.frame()
+for (k in 1:length(variables)){
+  var=variables[k]
+  outlier_windows <- read.table(paste0("3-Identify_Candidate_Loci/tables/",var,"_GenWin_windows_outliers.tsv"),
+                               h=T, as.is = T)
+  mean_w_length <- mean(outlier_windows$WindowLength)
+  
+  intersect_table <- read.table(paste0("3-Identify_Candidate_Loci/tables/total_intersect_candidate_fivepcs_windows.bed"),
+                               h=F, as.is = T)
+  intersect_windows <- data.frame()
+  for (n in 1:NROW(intersect_table)){
+   row <- intersect_table[n,]
+   SUB <- subset(outlier_windows, scaffold == row$V1 & WindowStart >= row$V2 & WindowStop <= row$V3)
+   intersect_windows <- rbind(intersect_windows, SUB)
+  }
+  mean_iw_length <- mean(intersect_windows$WindowLength)
+  min_iw_length <- min(intersect_windows$WindowLength)
+  max_iw_length <- max(intersect_windows$WindowLength)
+  sd_iw_length <- sd(intersect_windows$WindowLength)
+  mean_nsnp <- mean(intersect_windows$SNPcount)
+  min_nsnp <- min(intersect_windows$SNPcount)
+  max_nsnp <- max(intersect_windows$SNPcount)
+  sd_nsnp <- sd(intersect_windows$SNPcount)
+  n_windows <- nrow(intersect_windows)
+  tot_w_l <- sum(intersect_windows$WindowLength)
+  
+  row <- data.frame(pc=var, mean_length=mean_iw_length, min_length=min_iw_length, max_length=max_iw_length,
+                    sd_length=sd_iw_length, mean_snps=mean_nsnp, min_snps=min_nsnp, max_snps=max_nsnp, 
+                    sd_snps=sd_nsnp)
+  resume_genwin_df <- data.frame(rbind(resume_genwin_df,row))
+}
+
+write_tsv(resume_genwin_df, "3-Identify_Candidate_Loci/tables/resume_genwin.tsv")
 
 ## Plot intersections with Venn Diagrams ##
 
@@ -302,7 +419,7 @@ for (k in 1:length(variables)){
  p <- ggplot() +
    geom_point(data=inversion_snps, aes(x=position, y=BF.dB.), fill="grey32", shape=21, size=1.5) +
    theme_minimal()
- ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_", var, "_manplot.pdf"),  width = 14,
+ ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_", var, "_BFs_manplot.pdf"),  width = 14,
      height = 4)
 }
 
@@ -311,16 +428,35 @@ for (k in 1:length(variables)){
 rda.loadings <- read_tsv("3-Identify_Candidate_Loci/tables/rda_loadings_sigaxes.tsv",
                     col_names = T)
 
-rda.loadings.final <- data.frame()
-
-for (n in 1:length(rda.loadings$SNP)){
+rda.loadings.inversion <- data.frame()
+for (n in grep("scaffold_17", rda.loadings$SNP)){
   print(n)
-  snp.row <- rda.loadings[n,]
   snp <- rda.loadings$SNP[n]
   SCAF <- strsplit(snp, split = ":")[[1]][1]
   POS <- (strsplit(strsplit(snp, split = ":")[[1]][2], split = "_"))[[1]][1]
-  row <- data.frame(scaffold=SCAF, position=POS, RDA1=snp.row$RDA1, RDA2=snp.row$RDA2, RDA3=snp.row$RDA3)
-  rda.loadings.final <- rbind(rda.loadings.final, row)
+  row <- data.frame(scaffold=SCAF, position=POS, RDA1=rda.loadings$RDA1[n],
+                    RDA2=rda.loadings$RDA2[n], RDA3=rda.loadings$RDA3[n])
+  rda.loadings.inversion <- rbind(rda.loadings.inversion, row)
 }
+
+inversion_snps <- subset(rda.loadings.inversion, position >= 14005000 & position <= 22000000)
+p <- ggplot() +
+  geom_point(data=inversion_snps, aes(x=position, y=RDA1), fill="grey32", shape=21, size=1.5) +
+  theme_minimal()
+ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_RDA1_manplot.pdf"),  width = 14,
+    height = 4)
+
+p <- ggplot() +
+  geom_point(data=inversion_snps, aes(x=position, y=RDA2), fill="grey32", shape=21, size=1.5) +
+  theme_minimal()
+ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_RDA2_manplot.pdf"),  width = 14,
+    height = 4)
+
+p <- ggplot() +
+  geom_point(data=inversion_snps, aes(x=position, y=RDA3), fill="grey32", shape=21, size=1.5) +
+  theme_minimal()
+ggsave(p, filename = paste0("3-Identify_Candidate_Loci/plots/inversion_RDA3_manplot.pdf"),  width = 14,
+    height = 4)
+
 
 ```

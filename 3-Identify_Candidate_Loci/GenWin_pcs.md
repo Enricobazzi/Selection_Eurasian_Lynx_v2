@@ -172,7 +172,31 @@ To verify if it's really an inversion, I made a PCA of the SNPs present in this 
 
 ## Extract TOP SNP of each Window
 
-Extract the TOP SNP of each window (highest BF value), including only one SNP for the entire inversion (found between bases 17635000 and 18355000 on scaffold scaffold_17_arrow_ctg1).
+Extract the TOP SNP of each window (highest BF value), including only one SNP for the entire inversion (found between bases 17635000 and 18355000 on scaffold scaffold_17_arrow_ctg1) and excluding any SNPs with missing data.
+
+To get list of SNPs with missing data
+```{bash}
+# on genomics-a
+cd /home/ebazzicalupo/Selection_Eurasian_Lynx/VCF
+# remove samples from ll_wholegenome_LyCa_ref.sorted.filter7.vcf
+samplesARRAY=($(grep -m1 "#CHROM" ll_wholegenome_LyCa_ref.sorted.filter7.vcf | tr '\t' '\n' | grep "_ll_" | grep -vE "h_ll_ba_0214|h_ll_ba_0215|c_ll_ba_0216"))
+
+/opt/gatk-4.1.0.0/gatk SelectVariants \
+-R /GRUPOS/grupolince/reference_genomes/lynx_canadensis/lc4.fa \
+-V ll_wholegenome_LyCa_ref.sorted.filter7.vcf \
+$(for j in ${samplesARRAY[@]}; do echo "-sn ${j}";done) \
+-O all_samples.vcf
+
+
+# get SNPs from the finalset.maf5pc from allsamples vcf
+bedtools intersect -a all_samples.vcf \
+ -b ll_wholegenome_LyCa_ref.sorted.filter7.finalset.maf5pc.vcf \
+ > all_samples_finalsetvariants.vcf
+
+# get column defining where is missing data  
+grep -v "#" all_samples_finalsetvariants.vcf | cut -d';' -f3 | cut -d'=' -f2 | awk '{ if ($0 == "210") print "all"; else print "missing"; }' > missing_data_col.txt
+```
+In R get top snps:
 ```{R}
 variables <- c("PC1", "PC2", "PC3", "PC4", "PC5")
 
@@ -202,14 +226,17 @@ for (k in 1:length(variables)){
  # Add SNP ID information from SNPIDs table
  SNPIDs <- read_tsv("3-Identify_Candidate_Loci/tables/BayPass_OutPut/finalset.maf5pc.SNPIDs",
                     col_names = F)[,2-3] %>%
-    rename("scaffold" =  X2, "position" = X3)
+    rename(X2 = "scaffold", X3 = "position")
   
+ # Add column for missing data
+ miss_data_col <- read_tsv("3-Identify_Candidate_Loci/tables/missing_data_col.txt",
+                    col_names = F)
  # Add SNP IDs to the total snps table
- snps.table <- data.frame(snps.table,SNPIDs)
+ snps.table <- data.frame(snps.table,SNPIDs,miss_data_col)
 
  # Results BED file:
  bedresults <- data.frame(chr=snps.table$scaffold, start=(snps.table$position -1),
-                          stop=snps.table$position, BF=snps.table$BF.dB.)
+                          stop=snps.table$position, BF=snps.table$BF.dB., miss=snps.table$X1)
  
  outlier_windows <- read.table(paste0("3-Identify_Candidate_Loci/tables/",var,"_GenWin_windows_outliers.tsv"),
                                h=T, as.is = T)
@@ -223,7 +250,7 @@ for (k in 1:length(variables)){
    if (scaffold=="scaffold_17_arrow_ctg1" & Wstart >= 17635000 & Wstop <= 18355000) {
      window_snps <- subset(bedresults, chr == scaffold & start >= 17635000 & stop <= 18355000)
    } else {
-   window_snps <- subset(bedresults, chr == scaffold & start >= Wstart & stop <= Wstop)
+   window_snps <- subset(bedresults, chr == scaffold & start >= Wstart & stop <= Wstop & miss == "all")
    }
    topsnp <- window_snps[order(window_snps$BF,decreasing = TRUE),]
    topsnp <- topsnp[1,]
@@ -242,4 +269,3 @@ Upload to Genomics server
 scp ~/Documents/Selection_Eurasian_Lynx_v2/3-Identify_Candidate_Loci/tables/PC*_topsnps.range \
 ebazzicalupo@genomics-a.ebd.csic.es:/home/ebazzicalupo/Selection_Eurasian_Lynx/GenWin/
 ```
-

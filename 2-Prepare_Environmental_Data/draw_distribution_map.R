@@ -70,7 +70,7 @@ data <- worldclim[[2]]
 
 binary_data <- data > 0
 
-extent <- c(-10, 180, 20, 90) 
+extent <- c(-10, 180, 20, 80) 
 
 data.crop <- crop(binary_data, extent)
 distr.map <- readOGR("~/Downloads/redlist_species_data_1f4a1a8f-31fa-48ee-8678-7435f90a8ff9/data_0.shp")
@@ -79,11 +79,11 @@ r3 <- mask(r2, distr.map)
 
 cuts=c(0.99,1,1.01) #set breaks
 pal <- colorRampPalette(c("black","black"))
-pal2 <- colorRampPalette(c("darkgreen","darkgreen"))
+pal2 <- colorRampPalette(c("darkolivegreen4","darkolivegreen4"))
 
-pdf("2-Prepare_Environmental_Data/plots/distribution_map.pdf", width = 14)
+pdf("2-Prepare_Environmental_Data/plots/distribution_map.pdf", width = 12.5)
 plot(data.crop, alpha=0.4, breaks=cuts, col = pal(3), integrate=T)
 plot(r3, breaks=cuts, col = pal2(3), integrate=T, add=T)
-plot(distr.map, lwd=1.5, add=T)
-points(clim.points$x,clim.points$y, pch=21, lwd=1.5, cex=1.2, col="black", bg=bg[num]) # the lynxes
+plot(distr.map, lwd=1, add=T)
+points(clim.points$x,clim.points$y, pch=21, lwd=0.7, cex=0.8, col="black", bg=bg[num]) # the lynxes
 dev.off()

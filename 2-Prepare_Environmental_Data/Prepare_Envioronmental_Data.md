@@ -312,16 +312,28 @@ bg <- cols <- c("#A035AF",
 
 pca <- PCA(var.data, scale.unit = TRUE, ncp = 5, graph = TRUE)
 
+# Screeplot
+pdf(file = paste0("2-Prepare_Environmental_Data/plots/screeplot_allvars_pca.pdf"),
+    width = 8,
+    height = 8)
 fviz_eig(pca, addlabels = TRUE, ylim = c(0, 60))
+dev.off()
 
 # cos2 (quality of representation) of each variable
 # if only 2 PCs (~70% of variance)
 fviz_cos2(pca, choice = "var", axes = 1:2)
 # if only 3 PCs (~80% of variance)
-fviz_cos2(pca, choice = "var", axes = 1:3)
+fviz_cos2(pca, choice = "var", axes = 1:4)
 # if 5 PCs (~95% of variance)
 fviz_cos2(pca, choice = "var", axes = 1:5)
 
+for(n in 2:5){
+  pdf(file = paste0("2-Prepare_Environmental_Data/plots/cos2_pca_pcs1to", n,".pdf"),
+    width = 8,
+    height = 8)
+  fviz_cos2(pca, choice = "var", axes = 1:n)
+  dev.off()
+}
 
 # Color by cos2 values: quality on the factor map
 fviz_pca_var(pca, col.var = "cos2", axes = 2:3, 
